@@ -2,6 +2,22 @@
     "name": "@shieldsbetter/planet",
     "version": "0.1.0",
     "description": "Procedural planet generator: a spinning, lit, cloud-covered planet on a canvas.",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/shieldsbetter/planet.git"
+    },
+    "main": "planet.js",
+    "exports": {
+        ".": {
+            "import": "./planet.mjs",
+            "require": "./planet.js"
+        },
+        "./planet.js": "./planet.js"
+    },
+    "files": [
+        "planet.js",
+        "planet.mjs"
+    ],
     "scripts": {
         "format": "prettier --write .",
         "format:check": "prettier --check .",
