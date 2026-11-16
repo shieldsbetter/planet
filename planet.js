@@ -2,7 +2,9 @@
 //
 // Terrain is baked once into an equirectangular texture, and per-pixel sphere
 // geometry + lighting is cached whenever the canvas resizes. A frame is then
-// just a texture lookup and a composite, so it stays cheap on mobile.
+// just a texture lookup and a composite, so it stays cheap on mobile: done on
+// the GPU (WebGL2) by default, or in JavaScript (`renderer: 'software'`, and
+// wherever WebGL2 isn't available).
 (function (global) {
   'use strict';
 
@@ -1021,16 +1023,29 @@
     spin: 0.02,              // surface rotations per second; 0 for a still planet
     cloudSpin: 0.027,        // cloud rotations per second, independent of `spin`
     textureWidth: 768,
-    maxResolution: 400  // render-buffer cap; the canvas is upscaled by CSS
+    maxResolution: 400, // render-buffer cap; the canvas is upscaled by CSS
+    renderer: 'webgl'   // 'webgl' (falls back to software if unavailable) | 'software'; fixed at construction
   };
 
   function Planet(canvas, options, prebaked) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    // Installed before set() so the constructor's build is skipped entirely.
-    if (prebaked) this.tex = prebaked;
+    // A canvas gets one kind of context for life, so the renderer is chosen
+    // here: WebGL2 if asked for and available, else the 2D software path.
+    // `this.renderer` says which one it got.
+    var want = (options && options.renderer) || DEFAULTS.renderer;
+    this._gl = want === 'webgl' ? glCreate(canvas) : null;
+    this.renderer = this._gl ? 'webgl' : 'software';
+    if (this._gl) glWatchLoss(this);
+    else this.ctx = canvas.getContext('2d');
     this.opts = {};
     for (var k in DEFAULTS) this.opts[k] = DEFAULTS[k];
+    // Installed before set() so the constructor's build is skipped entirely --
+    // with the options it was baked from already adopted, or set() would see
+    // every non-default colour as a change and re-bake a compiled planet.
+    if (prebaked) {
+      this.tex = prebaked;
+      for (k in (options || {})) if (k in DEFAULTS) this.opts[k] = options[k];
+    }
     this.rotation = 0;
     this.cloudRotation = 0;
     this._raf = null;
@@ -1077,6 +1092,7 @@
     if (dirtyField) this.tex = buildField(this.opts);
     if (dirtyField || (dirtyColor && this.tex.heights)) {
       colorize(this.tex, this.opts, this.palette);
+      this._texDirty = true;
     }
     if (dirtyGeom) this.geom = null;
     this._needsRender = true;
@@ -1104,13 +1120,15 @@
     if (!this.geom || this._geomKey !== key) {
       this.geom = buildGeometry(W, H, this.opts, this.ringLUT);
       this._geomKey = key;
-      this.image = this.ctx.createImageData(W, H);
+      if (this._gl) this._geomDirty = true;
+      else this.image = this.ctx.createImageData(W, H);
       this._needsRender = true;
     }
     return this;
   };
 
   Planet.prototype.render = function () {
+    if (this._gl) return glRender(this);
     var g = this.geom, tex = this.tex, o = this.opts, pal = this.palette;
     var data = this.image.data;
     var n = g.W * g.H;
@@ -1238,6 +1256,222 @@
     return this;
   };
 
+  // ----------------------------------------------------------------- webgl
+  //
+  // The same composite as render()'s software loop, per fragment. The cached
+  // geometry goes up as four float textures (read texel-for-pixel), the baked
+  // surface/clouds/lights as ordinary filtered textures, so a frame is one
+  // full-screen triangle. The geometry is still built on the CPU, once per
+  // canvas size, exactly as for software.
+
+  var GL_VERT = '#version 300 es\n' +
+    'void main() {\n' +
+    '  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));\n' +
+    '  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n' +
+    '}\n';
+
+  // Colours are in 0..255, as in the software path, until the very end.
+  var GL_FRAG = '#version 300 es\n' +
+    'precision highp float;\n' +
+    'precision highp int;\n' +
+    'uniform highp sampler2D uG0, uG1, uG2, uG3;\n' +   // pu pv cu cv | alpha shade rim night | calpha cshade glow ringA | ringL mask
+    'uniform sampler2D uSurface, uClouds, uLights;\n' +
+    'uniform float uRot, uCrot, uCloudOp, uCityGain;\n' +
+    'uniform int uCities, uH;\n' +
+    'uniform vec3 uAtmo, uNight, uCloud, uRing, uCity;\n' +
+    'out vec4 outColor;\n' +
+    'void main() {\n' +
+    '  ivec2 p = ivec2(int(gl_FragCoord.x), uH - 1 - int(gl_FragCoord.y));\n' +
+    '  vec4 g0 = texelFetch(uG0, p, 0), g1 = texelFetch(uG1, p, 0);\n' +
+    '  vec4 g2 = texelFetch(uG2, p, 0), g3 = texelFetch(uG3, p, 0);\n' +
+    '  int m = int(g3.y + 0.5);\n' +
+    '  float glow = g2.z, ra = g2.w;\n' +
+    '  if (m == 0 && glow <= 0.002 && ra <= 0.002) { outColor = vec4(0.0); return; }\n' +
+    '  float a = glow > 0.0 ? min(glow, 1.0) : 0.0;\n' +
+    '  vec3 c = uAtmo * a;\n' +
+    '  if ((m & 1) != 0 && g1.x > 0.0) {\n' +
+    '    float pa = g1.x, sh = g1.y, rim = g1.z, nf = g1.w;\n' +
+    '    vec2 uv = vec2(g0.x + uRot, g0.y);\n' +
+    '    vec3 s = texture(uSurface, uv).rgb * 255.0 * sh + uNight * (1.0 - sh) * 0.35 + uAtmo * rim;\n' +
+    '    if (uCities != 0 && nf > 0.004) {\n' +
+    '      float li = texture(uLights, uv).r * 255.0;\n' +
+    '      if (li > 0.5) s += uCity * (li / 255.0) * nf * uCityGain;\n' +
+    '    }\n' +
+    '    c = s * pa + c * (1.0 - pa);\n' +
+    '    a = pa + a * (1.0 - pa);\n' +
+    '  }\n' +
+    '  if ((m & 2) != 0) {\n' +
+    '    float ca = texture(uClouds, vec2(g0.z + uCrot, g0.w)).r * g2.x * uCloudOp;\n' +
+    '    if (ca > 0.002) {\n' +
+    '      float csh = g2.y;\n' +
+    '      c = (uCloud * csh + uNight * (1.0 - csh) * 0.5) * ca + c * (1.0 - ca);\n' +
+    '      a = ca + a * (1.0 - ca);\n' +
+    '    }\n' +
+    '  }\n' +
+    '  if (ra > 0.002) {\n' +
+    '    float rl = g3.x;\n' +
+    '    c = (uRing * rl + uNight * (1.0 - rl) * 0.4) * ra + c * (1.0 - ra);\n' +
+    '    a = ra + a * (1.0 - ra);\n' +
+    '  }\n' +
+    '  if (a <= 0.0001) { outColor = vec4(0.0); return; }\n' +
+    // The software path un-premultiplies into clamped bytes; the canvas
+    // composites premultiplied, so clamp the same way and multiply back.
+    '  a = min(a, 1.0);\n' +
+    '  outColor = vec4(clamp(c / a / 255.0, 0.0, 1.0) * a, a);\n' +
+    '}\n';
+
+  // A WebGL2 context for `canvas`, with its program, or null (no WebGL2, or
+  // something that isn't a real canvas).
+  function glCreate(canvas) {
+    var gl = null;
+    try {
+      gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false });
+    } catch (e) { gl = null; }
+    if (!gl || typeof gl.createShader !== 'function') return null;
+    return glSetup(gl);
+  }
+
+  function glSetup(gl) {
+    function shader(type, src) {
+      var sh = gl.createShader(type);
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS) && !gl.isContextLost()) {
+        throw new Error('Planet: shader failed: ' + gl.getShaderInfoLog(sh));
+      }
+      return sh;
+    }
+    var prog = gl.createProgram();
+    gl.attachShader(prog, shader(gl.VERTEX_SHADER, GL_VERT));
+    gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, GL_FRAG));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS) && !gl.isContextLost()) {
+      throw new Error('Planet: program failed: ' + gl.getProgramInfoLog(prog));
+    }
+    gl.useProgram(prog);
+    var u = {};
+    ['uG0', 'uG1', 'uG2', 'uG3', 'uSurface', 'uClouds', 'uLights', 'uRot', 'uCrot', 'uCloudOp',
+     'uCityGain', 'uCities', 'uH', 'uAtmo', 'uNight', 'uCloud', 'uRing', 'uCity'].forEach(function (k) {
+      u[k] = gl.getUniformLocation(prog, k);
+    });
+    // Texture units: geometry 0-3, then surface, clouds, lights.
+    var names = ['g0', 'g1', 'g2', 'g3', 'surface', 'clouds', 'lights'];
+    var tex = {};
+    names.forEach(function (k, i) {
+      var t = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0 + i);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      var geo = i < 4;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, geo ? gl.NEAREST : gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, geo ? gl.NEAREST : gl.LINEAR);
+      // Longitude wraps; latitude clamps (as sampleRGB/sampleA do).
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, geo ? gl.CLAMP_TO_EDGE : gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      tex[k] = t;
+    });
+    gl.uniform1i(u.uG0, 0); gl.uniform1i(u.uG1, 1); gl.uniform1i(u.uG2, 2); gl.uniform1i(u.uG3, 3);
+    gl.uniform1i(u.uSurface, 4); gl.uniform1i(u.uClouds, 5); gl.uniform1i(u.uLights, 6);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    return { gl: gl, prog: prog, u: u, tex: tex };
+  }
+
+  // A mobile browser can take the context away (backgrounded, memory
+  // pressure). Keep the canvas, and rebuild everything GPU-side on restore.
+  function glWatchLoss(planet) {
+    var canvas = planet.canvas;
+    if (typeof canvas.addEventListener !== 'function') return;
+    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); });
+    canvas.addEventListener('webglcontextrestored', function () {
+      if (!planet._gl) return;
+      planet._gl = glSetup(planet._gl.gl);
+      planet._geomDirty = true;
+      planet._texDirty = true;
+      planet._needsRender = true;
+    });
+  }
+
+  function glBytes(a) {
+    return a instanceof Uint8Array ? a : new Uint8Array(a.buffer, a.byteOffset, a.length);
+  }
+
+  function glUploadGeometry(s, g) {
+    var gl = s.gl, n = g.W * g.H;
+    var packs = [
+      [g.pu, g.pv, g.cu, g.cv],
+      [g.alpha, g.shade, g.rim, g.night],
+      [g.calpha, g.cshade, g.glow, g.ringA],
+      [g.ringL, g.mask, null, null]
+    ];
+    var buf = new Float32Array(n * 4);
+    for (var t = 0; t < 4; t++) {
+      var src = packs[t];
+      for (var c = 0; c < 4; c++) {
+        var arr = src[c];
+        if (arr) for (var i = 0; i < n; i++) buf[i * 4 + c] = arr[i];
+        else for (var j = 0; j < n; j++) buf[j * 4 + c] = 0;
+      }
+      gl.activeTexture(gl.TEXTURE0 + t);
+      gl.bindTexture(gl.TEXTURE_2D, s.tex['g' + t]);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, g.W, g.H, 0, gl.RGBA, gl.FLOAT, buf);
+    }
+  }
+
+  function glUploadTextures(s, tex) {
+    var gl = s.gl;
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, s.tex.surface);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, tex.w, tex.h, 0, gl.RGB, gl.UNSIGNED_BYTE, glBytes(tex.surface));
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, s.tex.clouds);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, tex.w, tex.h, 0, gl.RED, gl.UNSIGNED_BYTE, glBytes(tex.clouds));
+    gl.activeTexture(gl.TEXTURE6);
+    gl.bindTexture(gl.TEXTURE_2D, s.tex.lights);
+    // Lights only exist with civilisation; an empty texture otherwise.
+    var lights = tex.lights || new Uint8Array(tex.w * tex.h);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, tex.w, tex.h, 0, gl.RED, gl.UNSIGNED_BYTE, glBytes(lights));
+  }
+
+  function glRender(planet) {
+    var s = planet._gl, gl = s.gl;
+    if (gl.isContextLost()) return planet;
+    var g = planet.geom, o = planet.opts, pal = planet.palette, u = s.u;
+    if (planet._geomDirty) { glUploadGeometry(s, g); planet._geomDirty = false; }
+    if (planet._texDirty || s.uploaded !== planet.tex) {
+      glUploadTextures(s, planet.tex);
+      s.uploaded = planet.tex;
+      planet._texDirty = false;
+    }
+    gl.viewport(0, 0, g.W, g.H);
+    gl.useProgram(s.prog);
+    // Wrapped here, so a long-running spin doesn't lose float precision.
+    gl.uniform1f(u.uRot, planet.rotation - Math.floor(planet.rotation));
+    gl.uniform1f(u.uCrot, planet.cloudRotation - Math.floor(planet.cloudRotation));
+    gl.uniform1f(u.uCloudOp, o.cloudOpacity);
+    gl.uniform1f(u.uCityGain, o.cityBrightness);
+    gl.uniform1i(u.uCities, o.civilization > 0 ? 1 : 0);
+    gl.uniform1i(u.uH, g.H);
+    gl.uniform3fv(u.uAtmo, pal.atmosphere);
+    gl.uniform3fv(u.uNight, pal.night);
+    gl.uniform3fv(u.uCloud, pal.cloud);
+    gl.uniform3fv(u.uRing, hexToRgb(o.ringColor));
+    gl.uniform3fv(u.uCity, hexToRgb(o.cityColor));
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    planet._needsRender = false;
+    return planet;
+  }
+
+  // Free the GPU side now rather than whenever the context is collected.
+  function glDestroy(planet) {
+    var s = planet._gl, gl = s.gl;
+    for (var k in s.tex) gl.deleteTexture(s.tex[k]);
+    gl.deleteProgram(s.prog);
+    var lose = gl.getExtension('WEBGL_lose_context');
+    if (lose && planet._owned) lose.loseContext(); // only a canvas we made
+    planet._gl = null;
+  }
+
   var SAVE_VERSION = 1;
 
   // ------------------------------------------------------------------- png
@@ -1364,6 +1598,8 @@
   Planet.prototype.getConfig = function () {
     var opts = {};
     for (var k in DEFAULTS) {
+      // How it's drawn belongs to the device loading it, not to the planet.
+      if (k === 'renderer') continue;
       var v = this.opts[k];
       // lightDir is an array; copy it so the save can't alias live state.
       opts[k] = (v && typeof v.slice === 'function') ? v.slice() : v;
@@ -1404,6 +1640,7 @@
     var d = parseSave(data, 'Planet#load');
     if (d.texture) {
       this.tex = decodeTexture(d.texture, 'Planet#load');
+      this._texDirty = true;
       // Adopt the options without letting set() decide to rebuild the field.
       for (var k in DEFAULTS) if (k in d.options) this.opts[k] = d.options[k];
       this.palette = derivePalette(this.opts);
@@ -1486,6 +1723,7 @@
     // Honour the size asked for rather than the on-screen default cap.
     var opts = { maxResolution: Math.max(w, h) };
     for (var k in (options || {})) opts[k] = options[k];
+    opts.renderer = 'software'; // it reads pixels back from this.image
     return new Planet(surrogate, opts);
   };
 
@@ -1547,6 +1785,7 @@
     if (this._owned && this.canvas && this.canvas.parentNode) {
       this.canvas.parentNode.removeChild(this.canvas);
     }
+    if (this._gl) glDestroy(this);
     this._owned = false;
     this.geom = null;
     this.tex = null;

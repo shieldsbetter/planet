@@ -251,6 +251,7 @@ palette stays coherent whatever you pick.
 | `cloudSpin` | `0.027` | Cloud rotations per second, independent of `spin`. Negative counter-rotates; clouds still drift over a planet with `spin: 0`. |
 | `textureWidth` | `768` | Terrain texture; height is half. |
 | `maxResolution` | `400` | Render-buffer cap in px; CSS upscales past it. |
+| `renderer` | `'webgl'` | `'webgl'` composites each frame on the GPU (WebGL2); `'software'` does it in JavaScript on a 2D canvas. WebGL falls back to software where WebGL2 isn't available; `planet.renderer` says which you got. Fixed when the planet is created (a canvas only ever gets one kind of context), so `set()` ignores it. `Planet.offscreen` is always software. Not saved by `getConfig()`/`compile()`: it's the device's choice, not the planet's. |
 
 ### Biomes
 
@@ -411,6 +412,14 @@ faster, slightly softer). After
 that, a frame is only a texture lookup plus cached per-pixel lighting: ~20ms at
 480², well under that at the default 400 cap. A planet with `spin: 0` stops
 redrawing entirely until an option changes.
+
+That per-frame composite runs on the GPU by default (`renderer: 'webgl'`): the
+cached geometry goes up as float textures once per canvas size, the baked
+textures once per bake, and a frame is one full-screen triangle, so the CPU
+does next to nothing while the planet spins. That matters most on a phone's
+battery. Output matches the software path to within 2/255 per channel. The
+GPU path survives a lost context (a backgrounded mobile tab) by re-uploading
+on restore.
 
 The bake is split into an expensive height-field pass and a cheap colorize pass,
 so changing `oceanColor`, `landColor` or `seaLevel` costs ~10ms rather than a
