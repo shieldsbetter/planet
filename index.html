@@ -1,230 +1,425 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Procedural Planet</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 28px;
-    padding: 24px;
-    font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    color: #cfd6e4;
-    background:
-      radial-gradient(900px 600px at 50% 38%, #16203a 0%, #0a0e1a 55%, #05070e 100%);
-  }
-  .stage {
-    position: relative;
-    width: min(78vw, 380px);
-    aspect-ratio: 1;
-    display: grid;
-    place-items: center;
-  }
-  .stage::after {
-    /* faint starfield so the planet isn't floating on flat black */
-    content: "";
-    position: absolute;
-    inset: -40%;
-    background-image:
-      radial-gradient(1px 1px at 20% 30%, #fff 50%, transparent),
-      radial-gradient(1px 1px at 70% 15%, #cfe 50%, transparent),
-      radial-gradient(1px 1px at 85% 62%, #fff 50%, transparent),
-      radial-gradient(1px 1px at 35% 78%, #dde 50%, transparent),
-      radial-gradient(1px 1px at 12% 60%, #fff 50%, transparent),
-      radial-gradient(1px 1px at 55% 90%, #bcd 50%, transparent);
-    opacity: .5;
-    z-index: -1;
-  }
-  .panel {
-    width: min(92vw, 420px);
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 10px 14px;
-    align-items: center;
-    padding: 16px 18px;
-    border: 1px solid #1e2740;
-    border-radius: 14px;
-    background: #0c1120cc;
-    backdrop-filter: blur(6px);
-  }
-  label { color: #8e9ab5; }
-  input[type=color] {
-    width: 100%; height: 30px; padding: 0;
-    border: 1px solid #263155; border-radius: 8px; background: none; cursor: pointer;
-  }
-  input[type=range] { width: 100%; accent-color: #5b8cd6; }
-  input[type=checkbox] { accent-color: #5b8cd6; width: 16px; height: 16px; }
-  .row { display: flex; align-items: center; gap: 10px; }
-  .row input[type=color] { width: 44px; flex: none; }
-  :disabled { opacity: .35; }
-  select {
-    width: 100%; padding: 6px 8px;
-    border: 1px solid #263155; border-radius: 8px;
-    background: #111830; color: #dbe3f3; font: inherit;
-  }
-  button {
-    grid-column: 1 / -1;
-    padding: 10px; margin-top: 4px;
-    border: 1px solid #2f3d66; border-radius: 10px;
-    background: #16203a; color: #dbe3f3;
-    font: inherit; font-weight: 600; cursor: pointer;
-  }
-  button:hover { background: #1c294a; }
-  .seed { grid-column: 1 / -1; text-align: center; color: #55618044; }
-</style>
-</head>
-<body>
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+        <title>Procedural Planet</title>
+        <style>
+            :root {
+                color-scheme: dark;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 28px;
+                padding: 24px;
+                font:
+                    13px/1.4 ui-sans-serif,
+                    system-ui,
+                    -apple-system,
+                    'Segoe UI',
+                    sans-serif;
+                color: #cfd6e4;
+                background: radial-gradient(
+                    900px 600px at 50% 38%,
+                    #16203a 0%,
+                    #0a0e1a 55%,
+                    #05070e 100%
+                );
+            }
+            .stage {
+                position: relative;
+                width: min(78vw, 380px);
+                aspect-ratio: 1;
+                display: grid;
+                place-items: center;
+            }
+            .stage::after {
+                /* faint starfield so the planet isn't floating on flat black */
+                content: '';
+                position: absolute;
+                inset: -40%;
+                background-image:
+                    radial-gradient(1px 1px at 20% 30%, #fff 50%, transparent),
+                    radial-gradient(1px 1px at 70% 15%, #cfe 50%, transparent),
+                    radial-gradient(1px 1px at 85% 62%, #fff 50%, transparent),
+                    radial-gradient(1px 1px at 35% 78%, #dde 50%, transparent),
+                    radial-gradient(1px 1px at 12% 60%, #fff 50%, transparent),
+                    radial-gradient(1px 1px at 55% 90%, #bcd 50%, transparent);
+                opacity: 0.5;
+                z-index: -1;
+            }
+            .panel {
+                width: min(92vw, 420px);
+                display: grid;
+                grid-template-columns: auto 1fr;
+                gap: 10px 14px;
+                align-items: center;
+                padding: 16px 18px;
+                border: 1px solid #1e2740;
+                border-radius: 14px;
+                background: #0c1120cc;
+                backdrop-filter: blur(6px);
+            }
+            label {
+                color: #8e9ab5;
+            }
+            input[type='color'] {
+                width: 100%;
+                height: 30px;
+                padding: 0;
+                border: 1px solid #263155;
+                border-radius: 8px;
+                background: none;
+                cursor: pointer;
+            }
+            input[type='range'] {
+                width: 100%;
+                accent-color: #5b8cd6;
+            }
+            input[type='checkbox'] {
+                accent-color: #5b8cd6;
+                width: 16px;
+                height: 16px;
+            }
+            .row {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .row input[type='color'] {
+                width: 44px;
+                flex: none;
+            }
+            :disabled {
+                opacity: 0.35;
+            }
+            select {
+                width: 100%;
+                padding: 6px 8px;
+                border: 1px solid #263155;
+                border-radius: 8px;
+                background: #111830;
+                color: #dbe3f3;
+                font: inherit;
+            }
+            button {
+                grid-column: 1 / -1;
+                padding: 10px;
+                margin-top: 4px;
+                border: 1px solid #2f3d66;
+                border-radius: 10px;
+                background: #16203a;
+                color: #dbe3f3;
+                font: inherit;
+                font-weight: 600;
+                cursor: pointer;
+            }
+            button:hover {
+                background: #1c294a;
+            }
+            .seed {
+                grid-column: 1 / -1;
+                text-align: center;
+                color: #55618044;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="stage" id="stage"></div>
 
-<div class="stage" id="stage"></div>
+        <div class="panel">
+            <label for="ocean">Ocean</label
+            ><input type="color" id="ocean" value="#1d5e86" />
+            <label for="land">Land</label
+            ><input type="color" id="land" value="#4a8f4a" />
+            <label for="landb">Biome</label
+            ><input type="color" id="landb" value="#a8994f" />
+            <label for="cloud">Clouds</label
+            ><input type="color" id="cloud" value="#ffffff" />
+            <label for="citycolor">Cities</label
+            ><input type="color" id="citycolor" value="#ffcf8a" />
+            <label for="terrain">Terrain</label
+            ><select id="terrain"></select>
+            <label for="sea">Water</label
+            ><input
+                type="range"
+                id="sea"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.62"
+            />
+            <label for="biome">Biome mix</label
+            ><input
+                type="range"
+                id="biome"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0"
+            />
+            <label for="clouds">Cloud cover</label
+            ><input
+                type="range"
+                id="clouds"
+                min="0"
+                max="1"
+                step="0.02"
+                value="0.42"
+            />
+            <label for="spin">Spin</label
+            ><input
+                type="range"
+                id="spin"
+                min="0"
+                max="0.12"
+                step="0.005"
+                value="0.02"
+            />
+            <label for="cspin">Cloud spin</label
+            ><input
+                type="range"
+                id="cspin"
+                min="-0.12"
+                max="0.12"
+                step="0.005"
+                value="0.027"
+            />
+            <label for="civ">Civilization</label
+            ><input
+                type="range"
+                id="civ"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0"
+            />
+            <label for="sun">Sun angle</label
+            ><input
+                type="range"
+                id="sun"
+                min="-180"
+                max="180"
+                step="1"
+                value="37"
+            />
+            <label for="axis">Axis tilt</label
+            ><input
+                type="range"
+                id="axis"
+                min="-90"
+                max="90"
+                step="1"
+                value="0"
+            />
+            <label for="rings">Rings</label>
+            <div class="row">
+                <input type="checkbox" id="rings" />
+                <input
+                    type="range"
+                    id="ringtilt"
+                    class="ring-ctl"
+                    min="0"
+                    max="90"
+                    step="1"
+                    value="18"
+                    disabled
+                />
+                <input
+                    type="color"
+                    id="ringcolor"
+                    class="ring-ctl"
+                    value="#cbbfa8"
+                    disabled
+                />
+            </div>
+            <label for="ringinner">Ring inner</label>
+            <input
+                type="range"
+                id="ringinner"
+                class="ring-ctl"
+                min="1.05"
+                max="2.80"
+                step="0.05"
+                value="1.35"
+                disabled
+            />
+            <label for="ringouter">Ring outer</label>
+            <input
+                type="range"
+                id="ringouter"
+                class="ring-ctl"
+                min="1.20"
+                max="3.00"
+                step="0.05"
+                value="2.25"
+                disabled
+            />
+            <button id="new">New planet</button>
+            <button id="compile">Compile to JSON</button>
+            <button id="png">Export PNG</button>
+            <div class="seed" id="seedLabel"></div>
+        </div>
 
-<div class="panel">
-  <label for="ocean">Ocean</label><input type="color" id="ocean" value="#1d5e86">
-  <label for="land">Land</label><input type="color" id="land" value="#4a8f4a">
-  <label for="landb">Biome</label><input type="color" id="landb" value="#a8994f">
-  <label for="cloud">Clouds</label><input type="color" id="cloud" value="#ffffff">
-  <label for="citycolor">Cities</label><input type="color" id="citycolor" value="#ffcf8a">
-  <label for="terrain">Terrain</label><select id="terrain"></select>
-  <label for="sea">Water</label><input type="range" id="sea" min="0" max="1" step="0.01" value="0.62">
-  <label for="biome">Biome mix</label><input type="range" id="biome" min="0" max="1" step="0.01" value="0">
-  <label for="clouds">Cloud cover</label><input type="range" id="clouds" min="0" max="1" step="0.02" value="0.42">
-  <label for="spin">Spin</label><input type="range" id="spin" min="0" max="0.12" step="0.005" value="0.02">
-  <label for="cspin">Cloud spin</label><input type="range" id="cspin" min="-0.12" max="0.12" step="0.005" value="0.027">
-  <label for="civ">Civilization</label><input type="range" id="civ" min="0" max="1" step="0.01" value="0">
-  <label for="sun">Sun angle</label><input type="range" id="sun" min="-180" max="180" step="1" value="37">
-  <label for="axis">Axis tilt</label><input type="range" id="axis" min="-90" max="90" step="1" value="0">
-  <label for="rings">Rings</label>
-  <div class="row">
-    <input type="checkbox" id="rings">
-    <input type="range" id="ringtilt" class="ring-ctl" min="0" max="90" step="1" value="18" disabled>
-    <input type="color" id="ringcolor" class="ring-ctl" value="#cbbfa8" disabled>
-  </div>
-  <label for="ringinner">Ring inner</label>
-  <input type="range" id="ringinner" class="ring-ctl" min="1.05" max="2.80" step="0.05" value="1.35" disabled>
-  <label for="ringouter">Ring outer</label>
-  <input type="range" id="ringouter" class="ring-ctl" min="1.20" max="3.00" step="0.05" value="2.25" disabled>
-  <button id="new">New planet</button>
-  <button id="compile">Compile to JSON</button>
-  <button id="png">Export PNG</button>
-  <div class="seed" id="seedLabel"></div>
-</div>
+        <script src="planet.js"></script>
+        <script>
+            (function () {
+                var seed =
+                    Number(location.hash.slice(1)) || (Math.random() * 1e9) | 0;
 
-<script src="planet.js"></script>
-<script>
-(function () {
-  var seed = Number(location.hash.slice(1)) || (Math.random() * 1e9) | 0;
+                // Creates the canvas, keeps it sized to #stage, and starts the loop.
+                var planet = Planet.mount('#stage', { seed: seed });
 
-  // Creates the canvas, keeps it sized to #stage, and starts the loop.
-  var planet = Planet.mount('#stage', { seed: seed });
+                function setSeed(s) {
+                    seed = s;
+                    location.hash = String(seed);
+                    document.getElementById('seedLabel').textContent =
+                        'seed ' + seed;
+                    planet.set({ seed: seed });
+                }
+                setSeed(seed);
 
-  function setSeed(s) {
-    seed = s;
-    location.hash = String(seed);
-    document.getElementById('seedLabel').textContent = 'seed ' + seed;
-    planet.set({ seed: seed });
-  }
-  setSeed(seed);
+                var terrainSel = document.getElementById('terrain');
+                Planet.TERRAINS.forEach(function (name) {
+                    var opt = document.createElement('option');
+                    opt.value = opt.textContent = name;
+                    terrainSel.appendChild(opt);
+                });
+                terrainSel.value = Planet.DEFAULTS.terrain;
 
-  var terrainSel = document.getElementById('terrain');
-  Planet.TERRAINS.forEach(function (name) {
-    var opt = document.createElement('option');
-    opt.value = opt.textContent = name;
-    terrainSel.appendChild(opt);
-  });
-  terrainSel.value = Planet.DEFAULTS.terrain;
+                var bind = function (id, key, parse) {
+                    var el = document.getElementById(id);
+                    el.addEventListener('input', function () {
+                        var o = {};
+                        o[key] = parse ? parse(el.value) : el.value;
+                        planet.set(o);
+                    });
+                };
+                // Each algorithm has a water level it reads best at; move the slider with
+                // the dropdown so switching terrain lands somewhere sensible.
+                var SUGGESTED_WATER = {
+                    continents: 0.62,
+                    ridged: 0.6,
+                    plates: 0.62,
+                    archipelago: 0.8,
+                    pangaea: 0.62,
+                };
+                terrainSel.addEventListener('input', function () {
+                    var w = SUGGESTED_WATER[terrainSel.value];
+                    var seaEl = document.getElementById('sea');
+                    if (w !== undefined) seaEl.value = w;
+                    planet.set({
+                        terrain: terrainSel.value,
+                        seaLevel: Number(seaEl.value),
+                    });
+                });
+                bind('ocean', 'oceanColor');
+                bind('land', 'landColor');
+                bind('landb', 'landColorB');
+                bind('cloud', 'cloudColor');
+                bind('citycolor', 'cityColor');
+                bind('sea', 'seaLevel', Number);
+                bind('biome', 'biomeSplit', Number);
+                bind('clouds', 'cloudAmount', Number);
+                bind('spin', 'spin', Number);
+                bind('cspin', 'cloudSpin', Number);
+                bind('civ', 'civilization', Number);
+                bind('sun', 'sunAzimuth', Number);
+                bind('axis', 'axialTilt', Number);
+                bind('ringtilt', 'ringTilt', Number);
+                bind('ringcolor', 'ringColor');
 
-  var bind = function (id, key, parse) {
-    var el = document.getElementById(id);
-    el.addEventListener('input', function () {
-      var o = {}; o[key] = parse ? parse(el.value) : el.value;
-      planet.set(o);
-    });
-  };
-  // Each algorithm has a water level it reads best at; move the slider with
-  // the dropdown so switching terrain lands somewhere sensible.
-  var SUGGESTED_WATER = { continents: 0.62, ridged: 0.60, plates: 0.62, archipelago: 0.80, pangaea: 0.62 };
-  terrainSel.addEventListener('input', function () {
-    var w = SUGGESTED_WATER[terrainSel.value];
-    var seaEl = document.getElementById('sea');
-    if (w !== undefined) seaEl.value = w;
-    planet.set({ terrain: terrainSel.value, seaLevel: Number(seaEl.value) });
-  });
-  bind('ocean', 'oceanColor');
-  bind('land', 'landColor');
-  bind('landb', 'landColorB');
-  bind('cloud', 'cloudColor');
-  bind('citycolor', 'cityColor');
-  bind('sea', 'seaLevel', Number);
-  bind('biome', 'biomeSplit', Number);
-  bind('clouds', 'cloudAmount', Number);
-  bind('spin', 'spin', Number);
-  bind('cspin', 'cloudSpin', Number);
-  bind('civ', 'civilization', Number);
-  bind('sun', 'sunAzimuth', Number);
-  bind('axis', 'axialTilt', Number);
-  bind('ringtilt', 'ringTilt', Number);
-  bind('ringcolor', 'ringColor');
+                // Inner and outer can't cross: whichever one you drag pushes the other along
+                // rather than letting the renderer silently clamp behind the slider's back.
+                var GAP = 0.15;
+                var innerEl = document.getElementById('ringinner');
+                var outerEl = document.getElementById('ringouter');
+                function bindRadius(el, other, isInner) {
+                    el.addEventListener('input', function () {
+                        var a = Number(innerEl.value),
+                            b = Number(outerEl.value);
+                        if (b - a < GAP) {
+                            if (isInner)
+                                outerEl.value = b = Math.min(
+                                    Number(outerEl.max),
+                                    a + GAP,
+                                );
+                            else
+                                innerEl.value = a = Math.max(
+                                    Number(innerEl.min),
+                                    b - GAP,
+                                );
+                            // If the pushed slider hit its stop, give the ground back to the other.
+                            if (b - a < GAP) {
+                                if (isInner) innerEl.value = a = b - GAP;
+                                else outerEl.value = b = a + GAP;
+                            }
+                        }
+                        planet.set({ ringInner: a, ringOuter: b });
+                    });
+                }
+                bindRadius(innerEl, outerEl, true);
+                bindRadius(outerEl, innerEl, false);
 
-  // Inner and outer can't cross: whichever one you drag pushes the other along
-  // rather than letting the renderer silently clamp behind the slider's back.
-  var GAP = 0.15;
-  var innerEl = document.getElementById('ringinner');
-  var outerEl = document.getElementById('ringouter');
-  function bindRadius(el, other, isInner) {
-    el.addEventListener('input', function () {
-      var a = Number(innerEl.value), b = Number(outerEl.value);
-      if (b - a < GAP) {
-        if (isInner) outerEl.value = b = Math.min(Number(outerEl.max), a + GAP);
-        else innerEl.value = a = Math.max(Number(innerEl.min), b - GAP);
-        // If the pushed slider hit its stop, give the ground back to the other.
-        if (b - a < GAP) {
-          if (isInner) innerEl.value = a = b - GAP;
-          else outerEl.value = b = a + GAP;
-        }
-      }
-      planet.set({ ringInner: a, ringOuter: b });
-    });
-  }
-  bindRadius(innerEl, outerEl, true);
-  bindRadius(outerEl, innerEl, false);
+                var ringsEl = document.getElementById('rings');
+                ringsEl.addEventListener('input', function () {
+                    var on = ringsEl.checked;
+                    var ctl = document.querySelectorAll('.ring-ctl');
+                    for (var i = 0; i < ctl.length; i++) ctl[i].disabled = !on;
+                    planet.set({ rings: on });
+                });
 
-  var ringsEl = document.getElementById('rings');
-  ringsEl.addEventListener('input', function () {
-    var on = ringsEl.checked;
-    var ctl = document.querySelectorAll('.ring-ctl');
-    for (var i = 0; i < ctl.length; i++) ctl[i].disabled = !on;
-    planet.set({ rings: on });
-  });
+                function download(bytes, type, name) {
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(
+                        new Blob([bytes], { type: type }),
+                    );
+                    a.download = name;
+                    a.click();
+                    setTimeout(function () {
+                        URL.revokeObjectURL(a.href);
+                    }, 1000);
+                }
 
-  function download(bytes, type, name) {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([bytes], { type: type }));
-    a.download = name;
-    a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-  }
+                // exportFrame returns PNG bytes; saving them is up to the caller.
+                document
+                    .getElementById('png')
+                    .addEventListener('click', function () {
+                        download(
+                            planet.exportFrame(0),
+                            'image/png',
+                            'planet-' + seed + '.png',
+                        );
+                    });
 
-  // exportFrame returns PNG bytes; saving them is up to the caller.
-  document.getElementById('png').addEventListener('click', function () {
-    download(planet.exportFrame(0), 'image/png', 'planet-' + seed + '.png');
-  });
+                // Bake the current planet to a file you can ship and load with Planet.from.
+                document
+                    .getElementById('compile')
+                    .addEventListener('click', function () {
+                        download(
+                            JSON.stringify(planet.compile()),
+                            'application/json',
+                            'planet-' + seed + '.json',
+                        );
+                    });
 
-  // Bake the current planet to a file you can ship and load with Planet.from.
-  document.getElementById('compile').addEventListener('click', function () {
-    download(JSON.stringify(planet.compile()), 'application/json', 'planet-' + seed + '.json');
-  });
-
-  document.getElementById('new').addEventListener('click', function () {
-    setSeed((Math.random() * 1e9) | 0);
-  });
-})();
-</script>
-</body>
+                document
+                    .getElementById('new')
+                    .addEventListener('click', function () {
+                        setSeed((Math.random() * 1e9) | 0);
+                    });
+            })();
+        </script>
+    </body>
 </html>

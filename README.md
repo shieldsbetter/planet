@@ -20,7 +20,7 @@ Point it at a container and you're done:
 
 <script src="planet.js"></script>
 <script>
-  var planet = Planet.mount('#world', { seed: 12345, landColor: '#4a8f4a' });
+    var planet = Planet.mount('#world', { seed: 12345, landColor: '#4a8f4a' });
 </script>
 ```
 
@@ -39,13 +39,13 @@ element. It returns the `Planet`, so everything below still applies.
 - `autoStart: false` mounts and draws a single frame without starting a loop.
 
 ```js
-planet.set({ seaLevel: 0.8 });   // change options; see the cost tiers below
-planet.compile();                // bake to JSON (see below)
-planet.getConfig();              // config only, no textures
-planet.exportFrame(0);           // PNG bytes for the frame at t seconds
-planet.stop();                   // pause the loop
-planet.start();                  // resume
-planet.destroy();                // stop, unhook, remove the canvas. Idempotent.
+planet.set({ seaLevel: 0.8 }); // change options; see the cost tiers below
+planet.compile(); // bake to JSON (see below)
+planet.getConfig(); // config only, no textures
+planet.exportFrame(0); // PNG bytes for the frame at t seconds
+planet.stop(); // pause the loop
+planet.start(); // resume
+planet.destroy(); // stop, unhook, remove the canvas. Idempotent.
 ```
 
 Call `destroy()` when the view goes away — otherwise the animation loop keeps
@@ -55,7 +55,10 @@ Driving it yourself instead of using the loop:
 
 ```js
 var planet = Planet.mount('#world', { autoStart: false });
-function frame(dt) { planet.step(dt); planet.render(); }
+function frame(dt) {
+    planet.step(dt);
+    planet.render();
+}
 ```
 
 `planet.resize()` exists if you ever need to force a re-measure, but `mount`
@@ -95,7 +98,11 @@ scripts and Node:
 
 ```js
 const Planet = require('./planet.js');
-const p = Planet.offscreen(512, 512, { seed: 404, rings: true, civilization: 0.6 });
+const p = Planet.offscreen(512, 512, {
+    seed: 404,
+    rings: true,
+    civilization: 0.6,
+});
 fs.writeFileSync('planet.png', p.exportFrame(0));
 ```
 
@@ -116,8 +123,12 @@ require('fs').writeFileSync('planet.json', JSON.stringify(planet.compile()));
 
 // runtime
 fetch('planet.json')
-  .then(function (r) { return r.json(); })
-  .then(function (data) { Planet.from('#world', data); });
+    .then(function (r) {
+        return r.json();
+    })
+    .then(function (data) {
+        Planet.from('#world', data);
+    });
 ```
 
 The demo's **Compile to JSON** button downloads the planet currently on screen.
@@ -129,13 +140,13 @@ compiled file or a plain config save.
 
 Measured on the default 768-wide texture, a planet with rings and cities:
 
-| | |
-| --- | --- |
-| generate | 667ms |
+|                   |          |
+| ----------------- | -------- |
+| generate          | 667ms    |
 | **load compiled** | **42ms** |
-| JSON on disk | 1.88MB |
-| gzipped | 0.35MB |
-| brotli | 0.28MB |
+| JSON on disk      | 1.88MB   |
+| gzipped           | 0.35MB   |
+| brotli            | 0.28MB   |
 
 Round-tripping is pixel-identical — the compiled planet renders byte-for-byte
 the same as the one it came from.
@@ -188,13 +199,13 @@ line after the tag. It's still reachable as `Planet.Noise` (`mulberry32`,
 
 Set with `terrain`. `Planet.TERRAINS` lists them at runtime.
 
-| `terrain` | Look | Notes |
-| --- | --- | --- |
-| `continents` | Rounded earthlike landmasses | The default; safe for anything. |
-| `ridged` | Branching, mountainous, fjord-like coasts | Ridged multifractal. More visible highlands. |
-| `plates` | Large continents with mountain belts | Voronoi plates over the sphere, each continental or oceanic; boundaries raise mountain ranges, volcanic arcs, trenches and mid-ocean ridges. `plateCount` tunes the count. |
-| `archipelago` | Scattered island chains | Billow noise gated by a large-scale mask, so islands cluster and the ocean stays open. Best around `seaLevel: 0.80`. |
-| `pangaea` | One supercontinent | Placed near the equator on the front hemisphere, so it faces the camera at rotation 0 and swings past as the planet spins. |
+| `terrain`     | Look                                      | Notes                                                                                                                                                                      |
+| ------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `continents`  | Rounded earthlike landmasses              | The default; safe for anything.                                                                                                                                            |
+| `ridged`      | Branching, mountainous, fjord-like coasts | Ridged multifractal. More visible highlands.                                                                                                                               |
+| `plates`      | Large continents with mountain belts      | Voronoi plates over the sphere, each continental or oceanic; boundaries raise mountain ranges, volcanic arcs, trenches and mid-ocean ridges. `plateCount` tunes the count. |
+| `archipelago` | Scattered island chains                   | Billow noise gated by a large-scale mask, so islands cluster and the ocean stays open. Best around `seaLevel: 0.80`.                                                       |
+| `pangaea`     | One supercontinent                        | Placed near the equator on the front hemisphere, so it faces the camera at rotation 0 and swings past as the planet spins.                                                 |
 
 All of them go through a domain warp before evaluation — displacing the sample
 point is what turns blobby noise (and dead-straight Voronoi edges) into
@@ -210,48 +221,48 @@ Only the chosen colors matter for look; every other surface shade (deep water,
 coastal shelf, beach, highland, atmosphere tint) is derived from them so the
 palette stays coherent whatever you pick.
 
-| Option | Default | Notes |
-| --- | --- | --- |
-| `seed` | `1` | Any integer. Same seed, same planet. |
-| `oceanColor` / `landColor` | `#1d5e86` / `#4a8f4a` | Hex. `landColor` is biome A. |
-| `landColorB` | `'#a8994f'` | Biome B. Unused while `biomeSplit` is 0. |
-| `biomeSplit` | `0` | **Fraction of the land that is biome B**, 0…1. `0.5` = half the land each. |
-| `biomeScale` | `1.15` | Lower = fewer, broader biome regions. |
-| `atmosphereColor` | `null` | `null` derives a pale version of the ocean. |
-| `cloudColor` | `'#ffffff'` | Composited at render time, so changing it costs nothing but a redraw. |
-| `terrain` | `'continents'` | See above. |
-| `seaLevel` | `0.62` | **Fraction of the surface under water**, 0…1. `0` is all land, `1` is all ocean — both exact. |
-| `continentScale` | `1.55` | Higher = more, smaller landmasses. |
-| `plateCount` | `22` | `plates` only. |
-| `warp` | `0.30` | Domain warp; 0 gives rounder, blobbier continents. |
-| `cloudAmount` | `0.42` | `0` skips the cloud shell entirely. |
-| `cloudOpacity` | `0.75` | |
-| `cloudRadius` | `1.025` | Cloud shell size relative to the planet. |
-| `glowSize` / `glowStrength` | `0.12` / `0.70` | Outer atmosphere halo. |
-| `rimStrength` | `0.75` | Atmospheric brightening at the limb. |
-| `ambient` | `0.16` | Night-side floor. |
-| `sunAzimuth` | `37.376` | Degrees. `0` = sun behind the camera (full day, flat), `90` = terminator down the middle, `180` = behind the planet (night side facing you, lit only at the limb). Negative swings the other way. |
-| `sunElevation` | `24.870` | Degrees above the view horizontal. |
-| `lightDir` | `null` | Set an `[x, y, z]` vector to override the two angles. x right, y up, z toward viewer. |
-| `axialTilt` | `0` | Degrees the planet's axis leans toward the viewer. Independent of the rings. |
-| `axialRoll` | `0` | Degrees the axis leans in the screen plane. |
-| `civilization` | `0` | 0…1. City lights on the night side. |
-| `cityColor` | `'#ffcf8a'` | Composited at render time; free to change. |
-| `cityBrightness` | `0.95` | |
-| `cityClusters` | `24` | Settlement centres scattered over the globe. |
-| `rings` | `false` | Master switch. Everything below is inert while it's off. |
-| `ringColor` | `'#cbbfa8'` | Composited at render time; free to change. |
-| `ringInner` / `ringOuter` | `1.35` / `2.25` | In planet radii. |
-| `ringOpacity` | `0.85` | |
-| `ringTilt` | `18` | Degrees. `0` = edge-on, `90` = fully open. |
-| `ringRoll` | `-14` | Degrees of rotation in the screen plane. |
-| `ringBands` | `9` | Higher = finer banding. |
-| `ringShadow` | `0.60` | How strongly the rings shadow the planet. `0` disables. |
-| `spin` | `0.02` | Surface rotations per second. `0` = still. |
-| `cloudSpin` | `0.027` | Cloud rotations per second, independent of `spin`. Negative counter-rotates; clouds still drift over a planet with `spin: 0`. |
-| `textureWidth` | `768` | Terrain texture; height is half. |
-| `maxResolution` | `400` | Render-buffer cap in px; CSS upscales past it. |
-| `renderer` | `'webgl'` | `'webgl'` composites each frame on the GPU (WebGL2); `'software'` does it in JavaScript on a 2D canvas. WebGL falls back to software where WebGL2 isn't available; `planet.renderer` says which you got. Fixed when the planet is created (a canvas only ever gets one kind of context), so `set()` ignores it. `Planet.offscreen` is always software. Not saved by `getConfig()`/`compile()`: it's the device's choice, not the planet's. |
+| Option                      | Default               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `seed`                      | `1`                   | Any integer. Same seed, same planet.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `oceanColor` / `landColor`  | `#1d5e86` / `#4a8f4a` | Hex. `landColor` is biome A.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `landColorB`                | `'#a8994f'`           | Biome B. Unused while `biomeSplit` is 0.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `biomeSplit`                | `0`                   | **Fraction of the land that is biome B**, 0…1. `0.5` = half the land each.                                                                                                                                                                                                                                                                                                                                                                 |
+| `biomeScale`                | `1.15`                | Lower = fewer, broader biome regions.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `atmosphereColor`           | `null`                | `null` derives a pale version of the ocean.                                                                                                                                                                                                                                                                                                                                                                                                |
+| `cloudColor`                | `'#ffffff'`           | Composited at render time, so changing it costs nothing but a redraw.                                                                                                                                                                                                                                                                                                                                                                      |
+| `terrain`                   | `'continents'`        | See above.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `seaLevel`                  | `0.62`                | **Fraction of the surface under water**, 0…1. `0` is all land, `1` is all ocean — both exact.                                                                                                                                                                                                                                                                                                                                              |
+| `continentScale`            | `1.55`                | Higher = more, smaller landmasses.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `plateCount`                | `22`                  | `plates` only.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `warp`                      | `0.30`                | Domain warp; 0 gives rounder, blobbier continents.                                                                                                                                                                                                                                                                                                                                                                                         |
+| `cloudAmount`               | `0.42`                | `0` skips the cloud shell entirely.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `cloudOpacity`              | `0.75`                |                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `cloudRadius`               | `1.025`               | Cloud shell size relative to the planet.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `glowSize` / `glowStrength` | `0.12` / `0.70`       | Outer atmosphere halo.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `rimStrength`               | `0.75`                | Atmospheric brightening at the limb.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `ambient`                   | `0.16`                | Night-side floor.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `sunAzimuth`                | `37.376`              | Degrees. `0` = sun behind the camera (full day, flat), `90` = terminator down the middle, `180` = behind the planet (night side facing you, lit only at the limb). Negative swings the other way.                                                                                                                                                                                                                                          |
+| `sunElevation`              | `24.870`              | Degrees above the view horizontal.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `lightDir`                  | `null`                | Set an `[x, y, z]` vector to override the two angles. x right, y up, z toward viewer.                                                                                                                                                                                                                                                                                                                                                      |
+| `axialTilt`                 | `0`                   | Degrees the planet's axis leans toward the viewer. Independent of the rings.                                                                                                                                                                                                                                                                                                                                                               |
+| `axialRoll`                 | `0`                   | Degrees the axis leans in the screen plane.                                                                                                                                                                                                                                                                                                                                                                                                |
+| `civilization`              | `0`                   | 0…1. City lights on the night side.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `cityColor`                 | `'#ffcf8a'`           | Composited at render time; free to change.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `cityBrightness`            | `0.95`                |                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `cityClusters`              | `24`                  | Settlement centres scattered over the globe.                                                                                                                                                                                                                                                                                                                                                                                               |
+| `rings`                     | `false`               | Master switch. Everything below is inert while it's off.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ringColor`                 | `'#cbbfa8'`           | Composited at render time; free to change.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `ringInner` / `ringOuter`   | `1.35` / `2.25`       | In planet radii.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `ringOpacity`               | `0.85`                |                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `ringTilt`                  | `18`                  | Degrees. `0` = edge-on, `90` = fully open.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `ringRoll`                  | `-14`                 | Degrees of rotation in the screen plane.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ringBands`                 | `9`                   | Higher = finer banding.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `ringShadow`                | `0.60`                | How strongly the rings shadow the planet. `0` disables.                                                                                                                                                                                                                                                                                                                                                                                    |
+| `spin`                      | `0.02`                | Surface rotations per second. `0` = still.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `cloudSpin`                 | `0.027`               | Cloud rotations per second, independent of `spin`. Negative counter-rotates; clouds still drift over a planet with `spin: 0`.                                                                                                                                                                                                                                                                                                              |
+| `textureWidth`              | `768`                 | Terrain texture; height is half.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `maxResolution`             | `400`                 | Render-buffer cap in px; CSS upscales past it.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `renderer`                  | `'webgl'`             | `'webgl'` composites each frame on the GPU (WebGL2); `'software'` does it in JavaScript on a 2D canvas. WebGL falls back to software where WebGL2 isn't available; `planet.renderer` says which you got. Fixed when the planet is created (a canvas only ever gets one kind of context), so `set()` ignores it. `Planet.offscreen` is always software. Not saved by `getConfig()`/`compile()`: it's the device's choice, not the planet's. |
 
 ### Biomes
 
@@ -306,7 +317,7 @@ Three things fall out of doing it properly rather than drawing an ellipse:
 (`axialTilt`/`axialRoll`, both `0` by default, i.e. upright), so dragging the
 ring angle doesn't swing the globe around.
 
-Physically these *should* be locked — a ring sits in its planet's equatorial
+Physically these _should_ be locked — a ring sits in its planet's equatorial
 plane — and if you want that, set `axialTilt` equal to `ringTilt`. The reason
 it isn't the default: nothing here renders latitude. Biomes come from a climate
 field rather than bands, and there are no polar caps, so a tilted axis has no
@@ -337,7 +348,7 @@ light scattering forward through the ring when backlit.
 `civilization` lights up the night side. Cities are placed by a suitability
 field rather than by noise: settlement centres are scattered over the sphere and
 every land texel is scored by its distance to the nearest one, then weighted
-toward coastal plains (the waterline is already in hand, and land near it *is*
+toward coastal plains (the waterline is already in hand, and land near it _is_
 coastal), toward the temperate middle of the climate range, and away from peaks.
 A high-frequency mottle breaks the result up so lit regions get bright cores and
 dark voids instead of reading as solid blobs.
@@ -351,7 +362,7 @@ at `1`.
 Two things make the endpoints work. Every term in the suitability score keeps a
 floor above zero — without one, land outside the settlement radii could never
 light however far you pushed the slider, and the megalopolis would be
-unreachable. And the grain floor *rises* with `civilization`, so sparse
+unreachable. And the grain floor _rises_ with `civilization`, so sparse
 settlement is mostly dark gaps while a built-out planet fills them in and keeps
 the grain only as surface texture. Same field, opposite reading at the two ends
 of the slider.
@@ -364,7 +375,7 @@ unlit corridors), a medium speckle, and a fine one. There is deliberately no
 blob-shaped layer in it.
 
 An earlier version had one, and it looked wrong in a way that was hard to see:
-*where* the lights go is already decided by the settlement field and the
+_where_ the lights go is already decided by the settlement field and the
 coverage ramp, both low-frequency, so a third field at that same frequency just
 doubled the falloff. Everything landed in a long dim tail, the visible cores
 went solid, and all the fine structure sat below the threshold of what reads
@@ -386,7 +397,7 @@ side sprawling across the dark.
 ### The night term is not the shade term
 
 Worth knowing if you touch this code: the night factor driving the lights is
-computed from the raw lambert term *before* the ring shadow is multiplied in.
+computed from the raw lambert term _before_ the ring shadow is multiplied in.
 Deriving it from the cached `shade` would be the obvious shortcut and it is
 wrong — every city under the rings' shadow would switch its lights on in broad
 daylight.
