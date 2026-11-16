@@ -1780,7 +1780,7 @@
     // A WebGL2 context for `canvas`, with its program, or null (no WebGL2, or
     // something that isn't a real canvas).
     function glCreate(canvas) {
-        var gl = null;
+        var gl;
         try {
             gl = canvas.getContext('webgl2', {
                 alpha: true,
@@ -1789,7 +1789,7 @@
                 depth: false,
                 stencil: false,
             });
-        } catch (e) {
+        } catch {
             gl = null;
         }
         if (!gl || typeof gl.createShader !== 'function') return null;
