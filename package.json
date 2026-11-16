@@ -2,7 +2,6 @@
     "name": "@shieldsbetter/planet",
     "version": "0.1.0",
     "description": "Procedural planet generator: a spinning, lit, cloud-covered planet on a canvas.",
-    "private": true,
     "scripts": {
         "format": "prettier --write .",
         "format:check": "prettier --check .",
