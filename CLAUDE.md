@@ -9,7 +9,8 @@ npm run format          # prettier --write; format:check to verify
 python3 -m http.server  # then open index.html: the demo, a control for every option
 ```
 
-There are no tests yet.
+There are no tests yet. CI (`.github/workflows/ci.yml`) runs lint and the format check
+on Node 20/22/24 across Linux, Windows and macOS; `prepublishOnly` runs the same two.
 
 ---
 

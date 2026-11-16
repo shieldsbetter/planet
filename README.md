@@ -1,5 +1,7 @@
 # planet
 
+[![CI](https://github.com/shieldsbetter/planet/actions/workflows/ci.yml/badge.svg)](https://github.com/shieldsbetter/planet/actions/workflows/ci.yml)
+
 A procedural planet on a canvas: noise-generated terrain, clouds, atmosphere, city lights and rings, lit and spinning. No dependencies, browser or Node.
 
 <p>

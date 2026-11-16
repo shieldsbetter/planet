@@ -8,6 +8,22 @@
         "type": "git",
         "url": "git+https://github.com/shieldsbetter/planet.git"
     },
+    "bugs": {
+        "url": "https://github.com/shieldsbetter/planet/issues"
+    },
+    "homepage": "https://github.com/shieldsbetter/planet#readme",
+    "keywords": [
+        "planet",
+        "procedural",
+        "generator",
+        "canvas",
+        "webgl",
+        "noise",
+        "space"
+    ],
+    "engines": {
+        "node": ">=20"
+    },
     "main": "planet.js",
     "exports": {
         ".": {
@@ -23,7 +39,8 @@
     "scripts": {
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "lint": "eslint . --max-warnings 0"
+        "lint": "eslint . --max-warnings 0",
+        "prepublishOnly": "npm run lint && npm run format:check"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -31,5 +48,8 @@
         "eslint-plugin-perfectionist": "^5.14.0",
         "globals": "^17.14.0",
         "prettier": "^3.10.1"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }
