@@ -2,6 +2,8 @@
     "name": "@shieldsbetter/planet",
     "version": "0.1.0",
     "description": "Procedural planet generator: a spinning, lit, cloud-covered planet on a canvas.",
+    "license": "ISC",
+    "author": "Hampton Smith <1743291+hamptonsmith@users.noreply.github.com>",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/shieldsbetter/planet.git"
